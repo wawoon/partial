@@ -7,7 +7,7 @@ import (
 )
 
 type Updater struct {
-	original            interface{}
+	output              interface{}
 	UpdatedFields       map[string]Field
 	SkippedFields       map[string]Field
 	NotFoundFields      map[string]Field
@@ -24,21 +24,21 @@ var ErrNilPtr error = errors.New("the given object is nil")
 var ErrUpdateFieldsFailure error = errors.New("update fields failure")
 
 // NewUpdater will returns Updater object
-func NewUpdater(original interface{}) (*Updater, error) {
-	if original == nil {
+func NewUpdater(output interface{}) (*Updater, error) {
+	if output == nil {
 		return nil, ErrNilPtr
 	}
 
-	if reflect.TypeOf(original).Kind() != reflect.Ptr {
+	if reflect.TypeOf(output).Kind() != reflect.Ptr {
 		return nil, ErrNonStructPtr
 	}
 
-	ptr := reflect.ValueOf(original).Elem()
+	ptr := reflect.ValueOf(output).Elem()
 	if ptr.Type().Kind() != reflect.Struct {
 		return nil, ErrNonStructPtr
 	}
 
-	return &Updater{original: original}, nil
+	return &Updater{output: output}, nil
 }
 
 // shouldSkipField returns if Updater will skip the field or not.
@@ -75,12 +75,12 @@ func (u *Updater) Update(newValue interface{}) error {
 		return ErrNonStructPtr
 	}
 
-	if reflect.TypeOf(u.original).Kind() != reflect.Ptr {
+	if reflect.TypeOf(u.output).Kind() != reflect.Ptr {
 		return ErrNonStructPtr
 	}
 
-	originalValue := reflect.ValueOf(u.original).Elem()
-	if !originalValue.IsValid() {
+	outputValue := reflect.ValueOf(u.output).Elem()
+	if !outputValue.IsValid() {
 		return ErrNilPtr
 	}
 
@@ -102,7 +102,7 @@ func (u *Updater) Update(newValue interface{}) error {
 		}
 
 		// The assign-target field is searched in a non-case-sensitive way.
-		outputFieldValue := findFieldByInsensitiveName(originalValue, inputFieldType.Name)
+		outputFieldValue := findFieldByInsensitiveName(outputValue, inputFieldType.Name)
 
 		// If the field is not found, it is added to the not-found-fields list.
 		if !outputFieldValue.IsValid() {
