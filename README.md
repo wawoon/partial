@@ -1,14 +1,12 @@
 # partial
 
-This library provides a simple and debug-ready utility for updating some of the fields of a struct.
+This library provides a debug-ready and straightforward utility for updating some of the fields of a struct.
 
 # Background
 
-When implementing a partial update of a field using an RDBMS ORM, the Go language requires an if statement to determine if there has been an update for each of the fields. Since this implementation is often very complicated, we would like to provide an easy way to implement it.
+When implementing a partial update of a field using an ORM, we need to write many if-statements to determine if there is an update on each field. Since this implementation often becomes too redundant, I'd like to provide an easy way to implement it.
 
-There are several existing libraries, but my library is focused on making debugging easier.
-
-Updater provides an API to know which fields were successfully updated, which fields were skipped, and which fields failed to be updated.
+There are several libraries to solve this problem, but this library focuses on making debugging easier. This library provides the API to know which fields were updated, skipped, and failed.
 
 # Features
 
