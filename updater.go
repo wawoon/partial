@@ -19,6 +19,14 @@ type Field struct {
 	Value       reflect.Value
 }
 
+// ShouldSkipField returns if Updater will skip the field or not.
+// This function is overridable.
+var ShouldSkipField func(structField reflect.StructField, value reflect.Value) bool
+
+func init() {
+	ShouldSkipField = shouldSkipFieldImpl
+}
+
 var ErrNonStructPtr error = errors.New("the given object is not a struct pointer")
 var ErrNilPtr error = errors.New("the given object is nil")
 var ErrUpdateFieldsFailure error = errors.New("update fields failure")
@@ -41,8 +49,7 @@ func NewUpdater(output interface{}) (*Updater, error) {
 	return &Updater{output: output}, nil
 }
 
-// shouldSkipField returns if Updater will skip the field or not.
-func shouldSkipField(structField reflect.StructField, value reflect.Value) bool {
+func shouldSkipFieldImpl(structField reflect.StructField, value reflect.Value) bool {
 	if structField.Type.Kind() == reflect.Ptr {
 		if value.IsNil() {
 			return true
@@ -93,7 +100,7 @@ func (u *Updater) Update(newValue interface{}) error {
 		inputFieldType := inputValue.Type().Field(i)
 		inputFieldValue := inputValue.Field(i)
 
-		if shouldSkipField(inputFieldType, inputFieldValue) {
+		if ShouldSkipField(inputFieldType, inputFieldValue) {
 			skippedFields[inputFieldType.Name] = Field{
 				StructField: inputFieldType,
 				Value:       inputFieldValue,
