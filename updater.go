@@ -2,7 +2,6 @@ package partial
 
 import (
 	"errors"
-	"fmt"
 	"reflect"
 )
 
@@ -24,13 +23,6 @@ var ErrNilPtr error = errors.New("the given object is nil")
 var ErrUpdateFieldsFailure error = errors.New("update fields failure")
 
 func NewUpdater(original interface{}) (*Updater, error) {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Printf("Unexpected panic in NewUpdater: args %+v\n", original)
-			return
-		}
-	}()
-
 	if original == nil {
 		return nil, ErrNilPtr
 	}
@@ -48,17 +40,15 @@ func NewUpdater(original interface{}) (*Updater, error) {
 }
 
 func ShouldSkip(structField reflect.StructField, value reflect.Value) bool {
+	if structField.Type.Kind() == reflect.Ptr {
+		if value.IsNil() {
+			return true
+		}
+	}
 	return !value.IsValid()
 }
 
 func (u *Updater) Update(newValue interface{}) error {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Printf("Unexpected panic in Update: args %+v, panic: %+v\n", newValue, r)
-			return
-		}
-	}()
-
 	if newValue == nil {
 		return ErrNilPtr
 	}
@@ -110,30 +100,49 @@ func (u *Updater) Update(newValue interface{}) error {
 			continue
 		}
 
-		// If the field is assignable without a type conversion,
-		// we just assign the value.
-		if inputFieldValue.Type().AssignableTo(outputFieldValue.Type()) {
-			outputFieldValue.Set(inputFieldValue)
+		// There are 3 possible cases:
+		// 1. inputFieldValue is non-pointer (e.g. int), and outputFieldValue is non-pointer
+		// 2. inputFieldValue is pointer (e.g. *int), and outputFieldValue is non-pointer
+		// 3. inputFieldValue is pointer (e.g. *int), and outputFieldValue is pointer (e.g. *int)
 
-			updatedFields[inputFieldType.Name] = Field{
-				StructField: inputFieldType,
-				Value:       inputFieldValue,
+		// input:non-pointer -> output:non-pointer case
+		if inputFieldValue.Kind() != reflect.Ptr {
+			// If the field is assignable without a type conversion,
+			// we just assign the value.
+			if inputFieldValue.Type().AssignableTo(outputFieldValue.Type()) {
+				outputFieldValue.Set(inputFieldValue)
+
+				updatedFields[inputFieldType.Name] = Field{
+					StructField: inputFieldType,
+					Value:       inputFieldValue,
+				}
+
+				continue
 			}
-			continue
 		}
 
-		// if the input field is a pointer, we can't assign it to the output field
-		// so we need to check if the output field is a pointer and if the input field
-		// is assignable to the output field
-		if inputFieldValue.Type().Kind() == reflect.Ptr &&
-			inputFieldValue.Elem().Type().AssignableTo(outputFieldValue.Type()) {
-
-			outputFieldValue.Set(inputFieldValue.Elem())
-			updatedFields[inputFieldType.Name] = Field{
-				StructField: inputFieldType,
-				Value:       inputFieldValue.Elem(),
+		if inputFieldValue.Type().Kind() == reflect.Ptr {
+			if outputFieldValue.Type().Kind() != reflect.Ptr {
+				// input:pointer -> output:non-pointer case
+				if !inputFieldValue.IsNil() && inputFieldValue.Elem().Type().AssignableTo(outputFieldValue.Type()) {
+					outputFieldValue.Set(inputFieldValue.Elem())
+					updatedFields[inputFieldType.Name] = Field{
+						StructField: inputFieldType,
+						Value:       inputFieldValue.Elem(),
+					}
+					continue
+				}
+			} else {
+				// input:pointer -> ouput:pointer case
+				if inputFieldType.Type.AssignableTo(outputFieldValue.Type()) {
+					outputFieldValue.Set(inputFieldValue)
+					updatedFields[inputFieldType.Name] = Field{
+						StructField: inputFieldType,
+						Value:       inputFieldValue.Elem(),
+					}
+					continue
+				}
 			}
-			continue
 		}
 
 		// If we cannot assign the input field to the output field,
@@ -145,6 +154,7 @@ func (u *Updater) Update(newValue interface{}) error {
 	}
 
 	u.UpdatedFields = updatedFields
+	u.SkippedFields = skippedFields
 	u.NotFoundFields = notFoundFields
 	u.NotAssignableFields = notAssignableFields
 

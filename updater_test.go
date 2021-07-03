@@ -11,12 +11,18 @@ type dummyStruct struct {
 	A int
 	B string
 	C bool
+	D *int
+	E *string
+	F *bool
 }
 
 type dummyStructUpdate struct {
 	A *int
 	B *string
 	C *bool
+	D *int
+	E *string
+	F *bool
 }
 
 func TestNewUpdater(t *testing.T) {
@@ -25,6 +31,9 @@ func TestNewUpdater(t *testing.T) {
 		&dummyStruct{A: 1},
 		&dummyStruct{A: 1, B: "b"},
 		&dummyStruct{A: 1, B: "b", C: true},
+		&dummyStruct{A: 1, B: "b", C: true, D: new(int)},
+		&dummyStruct{A: 1, B: "b", C: true, D: new(int), E: new(string)},
+		&dummyStruct{A: 1, B: "b", C: true, D: new(int), E: new(string), F: new(bool)},
 	}
 
 	for _, successCase := range successCases {
@@ -57,20 +66,26 @@ func TestUpdateWithStruct(t *testing.T) {
 	assert.NoError(t, err, "Error creating updater")
 	assert.NotNil(t, updater, "Updater should not be nil")
 
-	err = updater.Update(dummyStruct{
+	d := 3
+	e := "e"
+	f := true
+
+	input := dummyStruct{
 		A: 2,
 		B: "b2",
 		C: false,
-	})
+		D: &d,
+		E: &e,
+		F: &f,
+	}
+	err = updater.Update(input)
 
 	assert.NoError(t, err, "Error updating struct")
 	assert.NotEmpty(t, updater.UpdatedFields, "Updated fields should not be empty")
 	assert.Empty(t, updater.NotFoundFields, "Not found fields should be empty")
 	assert.Empty(t, updater.NotAssignableFields, "Not assignable fields should be empty")
 
-	assert.Equal(t, 2, val.A, "a should be 2")
-	assert.Equal(t, "b2", val.B, "b should be b2")
-	assert.Equal(t, false, val.C, "c should be false")
+	assert.Equal(t, val, input, "Struct should be equal to input")
 }
 
 func TestUpdateWithPtrFields(t *testing.T) {
@@ -82,19 +97,49 @@ func TestUpdateWithPtrFields(t *testing.T) {
 	a := 2
 	b := "b2"
 	c := false
+	d := 3
+	e := "e"
+	f := true
 
-	err = updater.Update(dummyStructUpdate{
+	input := dummyStructUpdate{
 		A: &a,
 		B: &b,
 		C: &c,
-	})
+		D: &d,
+		E: &e,
+		F: &f,
+	}
+	err = updater.Update(input)
 
 	assert.NoError(t, err, "Error updating struct")
 	assert.NotEmpty(t, updater.UpdatedFields, "Updated fields should not be empty")
 	assert.Empty(t, updater.NotFoundFields, "Not found fields should be empty")
 	assert.Empty(t, updater.NotAssignableFields, "Not assignable fields should be empty")
 
-	assert.Equal(t, 2, val.A, "a should be 2")
-	assert.Equal(t, "b2", val.B, "b should be b2")
-	assert.Equal(t, false, val.C, "c should be false")
+	assert.Equal(t, a, val.A, "a should be 2")
+	assert.Equal(t, b, val.B, "b should be b2")
+	assert.Equal(t, c, val.C, "c should be false")
+	assert.Equal(t, d, *val.D, "d should be 3")
+	assert.Equal(t, e, *val.E, "e should be e")
+	assert.Equal(t, f, *val.F, "f should be true")
+
+	newA := 5
+	newE := "e3"
+	err = updater.Update(dummyStructUpdate{
+		A: &newA,
+		E: &newE,
+	})
+
+	assert.NotEmpty(t, updater.UpdatedFields, "Updated fields should not be empty")
+	assert.NotEmpty(t, updater.SkippedFields, "Skipped fields should not be empty")
+	assert.Empty(t, updater.NotFoundFields, "Not found fields should be empty")
+	assert.Empty(t, updater.NotAssignableFields, "Not assignable fields should be empty")
+
+	assert.NoError(t, err, "Error updating struct")
+	assert.Equal(t, newA, val.A, "a should be 0")
+	assert.Equal(t, b, val.B, "b should be b2")
+	assert.Equal(t, c, val.C, "c should be false")
+	assert.Equal(t, d, *val.D, "d should be 3")
+	assert.Equal(t, newE, *val.E, "e should be e3")
+	assert.Equal(t, f, *val.F, "f should be true")
 }
