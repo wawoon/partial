@@ -2,6 +2,7 @@ package partial_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/wawoon/partial"
@@ -142,4 +143,46 @@ func TestUpdateWithPtrFields(t *testing.T) {
 	assert.Equal(t, d, *val.D, "d should be 3")
 	assert.Equal(t, newE, *val.E, "e should be e3")
 	assert.Equal(t, f, *val.F, "f should be true")
+}
+
+type StructWithAdvancedField struct {
+	Time time.Time
+	Strs []string
+	Map  map[string]string
+}
+
+type StructWithAdvancedFieldUpdate struct {
+	Time *time.Time
+	Strs *[]string
+	Map  *map[string]string
+}
+
+func TestUpdateWithAdvancedField(t *testing.T) {
+	val := StructWithAdvancedField{}
+	updater, err := partial.NewUpdater(&val)
+	assert.NoError(t, err, "Error creating updater")
+
+	input := StructWithAdvancedField{
+		Time: time.Now(),
+		Strs: []string{"a", "b", "c"},
+		Map:  map[string]string{"a": "b", "c": "d"},
+	}
+	err = updater.Update(input)
+	assert.NoError(t, err, "Error updating struct")
+	assert.Equal(t, input, val, "Struct should be equal to input")
+
+	timeVal := time.Now()
+	strs := []string{"e", "f", "g"}
+	mapVal := map[string]string{"e": "f", "g": "h"}
+	input2 := StructWithAdvancedFieldUpdate{
+		Time: &timeVal,
+		Strs: &strs,
+		Map:  &mapVal,
+	}
+
+	err = updater.Update(input2)
+	assert.NoError(t, err, "Error updating struct")
+	assert.Equal(t, *input2.Time, val.Time, "Time should be equal")
+	assert.Equal(t, *input2.Strs, val.Strs, "Time should be equal")
+	assert.Equal(t, *input2.Map, val.Map, "Time should be equal")
 }
