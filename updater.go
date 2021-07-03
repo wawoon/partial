@@ -3,6 +3,7 @@ package partial
 import (
 	"errors"
 	"reflect"
+	"strings"
 )
 
 type Updater struct {
@@ -22,6 +23,7 @@ var ErrNonStructPtr error = errors.New("the given object is not a struct pointer
 var ErrNilPtr error = errors.New("the given object is nil")
 var ErrUpdateFieldsFailure error = errors.New("update fields failure")
 
+// NewUpdater will returns Updater object
 func NewUpdater(original interface{}) (*Updater, error) {
 	if original == nil {
 		return nil, ErrNilPtr
@@ -39,13 +41,23 @@ func NewUpdater(original interface{}) (*Updater, error) {
 	return &Updater{original: original}, nil
 }
 
-func ShouldSkip(structField reflect.StructField, value reflect.Value) bool {
+// shouldSkipField returns if Updater will skip the field or not.
+func shouldSkipField(structField reflect.StructField, value reflect.Value) bool {
 	if structField.Type.Kind() == reflect.Ptr {
 		if value.IsNil() {
 			return true
 		}
 	}
 	return !value.IsValid()
+}
+
+// findFieldByInsensitiveName finds a reflect.Value field by name in a non-case-sensitive way
+func findFieldByInsensitiveName(field reflect.Value, name string) reflect.Value {
+	inputFieldLowerCaseName := strings.ToLower(name)
+	foundField := field.FieldByNameFunc(func(s string) bool {
+		return strings.ToLower(s) == inputFieldLowerCaseName
+	})
+	return foundField
 }
 
 func (u *Updater) Update(newValue interface{}) error {
@@ -81,7 +93,7 @@ func (u *Updater) Update(newValue interface{}) error {
 		inputFieldType := inputValue.Type().Field(i)
 		inputFieldValue := inputValue.Field(i)
 
-		if ShouldSkip(inputFieldType, inputFieldValue) {
+		if shouldSkipField(inputFieldType, inputFieldValue) {
 			skippedFields[inputFieldType.Name] = Field{
 				StructField: inputFieldType,
 				Value:       inputFieldValue,
@@ -89,8 +101,10 @@ func (u *Updater) Update(newValue interface{}) error {
 			continue
 		}
 
-		outputFieldValue := originalValue.FieldByName(inputFieldType.Name)
+		// The assign-target field is searched in a non-case-sensitive way.
+		outputFieldValue := findFieldByInsensitiveName(originalValue, inputFieldType.Name)
 
+		// If the field is not found, it is added to the not-found-fields list.
 		if !outputFieldValue.IsValid() {
 			notFoundFields[inputFieldType.Name] = Field{
 				StructField: inputFieldType,
