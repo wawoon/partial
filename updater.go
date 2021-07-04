@@ -7,7 +7,10 @@ import (
 )
 
 type Updater struct {
-	output              interface{}
+	output          interface{}
+	FindFieldByName func(reflect.Value, string) reflect.Value
+	ShouldSkipField func(structField reflect.StructField, value reflect.Value) bool
+
 	UpdatedFields       map[string]Field
 	SkippedFields       map[string]Field
 	NotFoundFields      map[string]Field
@@ -17,14 +20,6 @@ type Updater struct {
 type Field struct {
 	StructField reflect.StructField
 	Value       reflect.Value
-}
-
-// ShouldSkipField returns if Updater will skip the field or not.
-// This function is overridable.
-var ShouldSkipField func(structField reflect.StructField, value reflect.Value) bool
-
-func init() {
-	ShouldSkipField = shouldSkipFieldImpl
 }
 
 var ErrNonStructPtr error = errors.New("the given object is not a struct pointer")
@@ -46,7 +41,11 @@ func NewUpdater(output interface{}) (*Updater, error) {
 		return nil, ErrNonStructPtr
 	}
 
-	return &Updater{output: output}, nil
+	return &Updater{
+		output:          output,
+		FindFieldByName: findFieldByInsensitiveName,
+		ShouldSkipField: shouldSkipFieldImpl,
+	}, nil
 }
 
 func shouldSkipFieldImpl(structField reflect.StructField, value reflect.Value) bool {
@@ -100,7 +99,7 @@ func (u *Updater) Update(newValue interface{}) error {
 		inputFieldType := inputValue.Type().Field(i)
 		inputFieldValue := inputValue.Field(i)
 
-		if ShouldSkipField(inputFieldType, inputFieldValue) {
+		if u.ShouldSkipField(inputFieldType, inputFieldValue) {
 			skippedFields[inputFieldType.Name] = Field{
 				StructField: inputFieldType,
 				Value:       inputFieldValue,
