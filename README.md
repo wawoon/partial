@@ -67,7 +67,7 @@ func main() {
 		panic(err)
 	}
 
-	err = updater.Update(&userUpdate)
+	err = updater.Update(userUpdate)
 
 	// When the NotFoundFields and NotAssignableFields are not empty, it will return an error.
 	if err != nil {
